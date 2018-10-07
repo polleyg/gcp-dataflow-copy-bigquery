@@ -3,6 +3,7 @@
 purge.sh
 trigger_pipeline.sh
 /.gradle/
+/gradle/
 /.idea/
 /build/
 /classes/
