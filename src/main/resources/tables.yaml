@@ -1,0 +1,5 @@
+- src: "grey-sort-challenge:src_US_dataset.src_US_table"
+  des: "grey-sort-challenge:des_EU_dataset.src_US_table_copy_1"
+
+- src: "grey-sort-challenge:src_US_dataset.src_US_table"
+  des: "grey-sort-challenge:des_EU_dataset.src_US_table_copy_2"

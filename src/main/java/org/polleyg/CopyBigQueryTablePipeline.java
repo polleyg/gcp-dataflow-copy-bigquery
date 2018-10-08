@@ -1,5 +1,9 @@
 package org.polleyg;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
@@ -10,6 +14,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,25 +24,10 @@ import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposit
 /**
  * Copies a BigQuery table from anywhere to anywhere, even across regions.
  */
-public class TemplatePipeline {
-    private static final String SRC_BQ_TABLE = "grey-sort-challenge:src_US_dataset.src_US_table";
-    private static final String DES_BQ_TABLE = "grey-sort-challenge:des_EU_dataset.src_US_table_copy";
+public class CopyBigQueryTablePipeline {
 
-    public static void main(String[] args) {
-        PipelineOptionsFactory.register(DataflowPipelineOptions.class);
-        DataflowPipelineOptions options = PipelineOptionsFactory
-                .fromArgs(args)
-                .withValidation()
-                .as(DataflowPipelineOptions.class);
-        Pipeline pipeline = Pipeline.create(options);
-        pipeline.apply("Read_from_US", BigQueryIO.readTableRows().from(SRC_BQ_TABLE))
-                .apply("Transform", ParDo.of(new TableRowCopyParDo()))
-                .apply("Write_to_EU", BigQueryIO.writeTableRows()
-                        .to(DES_BQ_TABLE)
-                        .withCreateDisposition(CREATE_IF_NEEDED)
-                        .withWriteDisposition(WRITE_APPEND)
-                        .withSchema(getTableSchema()));
-        pipeline.run();
+    public static void main(String[] args) throws Exception {
+        new CopyBigQueryTablePipeline().execute(args);
     }
 
     private static TableSchema getTableSchema() {
@@ -52,10 +42,42 @@ public class TemplatePipeline {
         return new TableSchema().setFields(fields);
     }
 
+    private void execute(String[] args) throws Exception {
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        List<BigQueryTableCopy> copies = mapper.readValue(
+                new File(getClass().getClassLoader().getResource("tables.yaml").getFile()),
+                new TypeReference<List<BigQueryTableCopy>>() {
+                });
+
+        for (BigQueryTableCopy copy : copies) {
+            PipelineOptionsFactory.register(DataflowPipelineOptions.class);
+            DataflowPipelineOptions options = PipelineOptionsFactory
+                    .fromArgs(args)
+                    .withValidation()
+                    .as(DataflowPipelineOptions.class);
+            Pipeline pipeline = Pipeline.create(options);
+            pipeline.apply("Read_from_US", BigQueryIO.readTableRows().from(copy.src))
+                    .apply("Transform", ParDo.of(new TableRowCopyParDo()))
+                    .apply("Write_to_EU", BigQueryIO.writeTableRows()
+                            .to(copy.des)
+                            .withCreateDisposition(CREATE_IF_NEEDED)
+                            .withWriteDisposition(WRITE_APPEND)
+                            .withSchema(getTableSchema()));
+            pipeline.run();
+        }
+    }
+
     public static class TableRowCopyParDo extends DoFn<TableRow, TableRow> {
         @ProcessElement
         public void processElement(ProcessContext c) {
             c.output(c.element());
         }
+    }
+
+    public static class BigQueryTableCopy {
+        @JsonProperty
+        public String src;
+        @JsonProperty
+        public String des;
     }
 }

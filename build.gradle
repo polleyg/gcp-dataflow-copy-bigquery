@@ -17,6 +17,9 @@ dependencies {
     compile "org.apache.beam:beam-runners-google-cloud-dataflow-java:${beam_version}"
     compile "org.apache.beam:beam-sdks-java-io-google-cloud-platform:${beam_version}"
     compile "org.apache.beam:beam-sdks-java-extensions-google-cloud-platform-core:${beam_version}"
+    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jackson_dataformat_version}"
+    compile "com.fasterxml.jackson.core:jackson-databind:${jackson_databind_version}"
+    compile "org.apache.commons:commons-lang3:${apache_comms_lang3_version}"
 }
 
 run {
@@ -30,4 +33,4 @@ run {
     ]
 }
 
-mainClassName="org.polleyg.TemplatePipeline"
+mainClassName="org.polleyg.CopyBigQueryTablePipeline"
