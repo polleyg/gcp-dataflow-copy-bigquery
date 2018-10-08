@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition.WRITE_APPEND;
+import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE;
 
 /**
  * Copies a BigQuery table from anywhere to anywhere, even across regions.
@@ -61,7 +62,7 @@ public class CopyBigQueryTablePipeline {
                     .apply("Write_to_EU", BigQueryIO.writeTableRows()
                             .to(copy.des)
                             .withCreateDisposition(CREATE_IF_NEEDED)
-                            .withWriteDisposition(WRITE_APPEND)
+                            .withWriteDisposition(WRITE_TRUNCATE)
                             .withSchema(getTableSchema()));
             pipeline.run();
         }

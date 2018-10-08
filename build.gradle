@@ -28,8 +28,8 @@ run {
             "--maxNumWorkers=3",
             "--numWorkers=1",
             "--zone=australia-southeast1-a",
-            "--stagingLocation=gs://copy-bq-tables-pipeline/jars",
-            "--tempLocation=gs://copy-bq-tables-pipeline/tmp"
+            "--stagingLocation=gs://a-us-bucket/jars",
+            "--tempLocation=gs://a-us-bucket/tmp"
     ]
 }
 
