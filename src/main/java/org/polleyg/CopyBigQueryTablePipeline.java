@@ -11,6 +11,7 @@ import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.bigquery.DatasetId;
 import com.google.cloud.storage.*;
+import com.google.common.collect.ImmutableMap;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
@@ -23,6 +24,7 @@ import org.apache.beam.sdk.transforms.ParDo;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static java.lang.String.format;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
@@ -32,6 +34,12 @@ import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposit
  * Copies a BigQuery table from anywhere to anywhere, even across regions.
  */
 public class CopyBigQueryTablePipeline {
+    private static Map<String, StorageClass> BQ_REGION_TO_GCS_BUCKET_TYPE = ImmutableMap.of(
+            "us", StorageClass.MULTI_REGIONAL,
+            "eu", StorageClass.MULTI_REGIONAL,
+            "asia-northeast1", StorageClass.REGIONAL,
+            "europe-west2", StorageClass.REGIONAL);
+
     public static void main(String[] args) throws Exception {
         new CopyBigQueryTablePipeline().execute(args);
     }
@@ -99,12 +107,12 @@ public class CopyBigQueryTablePipeline {
         try {
             storage.create(
                     BucketInfo.newBuilder(name)
-                            .setStorageClass(StorageClass.MULTI_REGIONAL)
+                            .setStorageClass(BQ_REGION_TO_GCS_BUCKET_TYPE.get(location))
                             .setLocation(location)
                             .build()
             );
         } catch (StorageException e) {
-            if (e.getCode() != 409) throw new RuntimeException(e);
+            if (e.getCode() != 409) throw new RuntimeException(e); //bucket already exists
         }
     }
 

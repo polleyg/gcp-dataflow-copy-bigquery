@@ -1,5 +1,11 @@
+#US->EU (multi-regional)
 - src: "grey-sort-challenge:src_US_dataset.src_US_table"
-  des: "grey-sort-challenge:des_EU_dataset.i_was_copied_from_us_to_eu"
+  des: "grey-sort-challenge:a_EU_dataset.i_was_copied_from_us_to_eu"
 
-- src: "grey-sort-challenge:des_EU_dataset.src_EU_table"
-  des: "grey-sort-challenge:src_US_dataset.i_was_copied_from_eu_to_us"
+  #EU->US (multi-regional)
+- src: "grey-sort-challenge:src_EU_dataset.src_EU_table"
+  des: "grey-sort-challenge:a_US_dataset.i_was_copied_from_eu_to_us"
+
+  #EU->Tokyo (regional)
+- src: "grey-sort-challenge:src_EU_dataset.src_EU_table"
+  des: "grey-sort-challenge:a_Tokyo_dataset.i_was_copied_from_eu_to_tokyo"
