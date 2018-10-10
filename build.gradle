@@ -20,6 +20,8 @@ dependencies {
     compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jackson_dataformat_version}"
     compile "com.fasterxml.jackson.core:jackson-databind:${jackson_databind_version}"
     compile "org.apache.commons:commons-lang3:${apache_comms_lang3_version}"
+    compile "com.google.cloud:google-cloud-bigquery:${bigquery_version}"
+    compile "com.google.cloud:google-cloud-storage:${gcs_version}"
 }
 
 run {
@@ -27,9 +29,6 @@ run {
             "--runner=DataflowRunner",
             "--maxNumWorkers=3",
             "--numWorkers=1",
-            "--zone=australia-southeast1-a",
-            "--stagingLocation=gs://a-us-bucket/jars",
-            "--tempLocation=gs://a-us-bucket/tmp"
     ]
 }
 
