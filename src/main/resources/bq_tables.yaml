@@ -1,4 +1,4 @@
-#US->EU (multi-regional)
+  #US->EU (multi-regional)
 - src: "grey-sort-challenge:src_US_dataset.src_US_table"
   des: "grey-sort-challenge:a_EU_dataset.i_was_copied_from_us_to_eu"
 
