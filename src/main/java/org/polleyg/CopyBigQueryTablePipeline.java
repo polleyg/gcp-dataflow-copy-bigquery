@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition.WRITE_TRUNCATE;
 
@@ -34,7 +35,9 @@ import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposit
  * Copies a BigQuery table from anywhere to anywhere, even across regions.
  */
 public class CopyBigQueryTablePipeline {
-    private static Map<String, StorageClass> BQ_REGION_TO_GCS_BUCKET_TYPE = ImmutableMap.of(
+    private static final BigQuery BIGQUERY = BigQueryOptions.getDefaultInstance().getService();
+    private static final Storage STORAGE = StorageOptions.getDefaultInstance().getService();
+    private static final Map<String, StorageClass> BQ_REGION_TO_GCS_BUCKET_TYPE = ImmutableMap.of(
             "us", StorageClass.MULTI_REGIONAL,
             "eu", StorageClass.MULTI_REGIONAL,
             "asia-northeast1", StorageClass.REGIONAL,
@@ -44,15 +47,9 @@ public class CopyBigQueryTablePipeline {
         new CopyBigQueryTablePipeline().execute(args);
     }
 
-    private static TableSchema getTableSchema() {
+    private static TableSchema getTableSchema(Map<String, String> schema) {
         List<TableFieldSchema> fields = new ArrayList<>();
-        fields.add(new TableFieldSchema().setName("year").setType("INTEGER"));
-        fields.add(new TableFieldSchema().setName("month").setType("INTEGER"));
-        fields.add(new TableFieldSchema().setName("day").setType("INTEGER"));
-        fields.add(new TableFieldSchema().setName("wikimedia_project").setType("STRING"));
-        fields.add(new TableFieldSchema().setName("language").setType("STRING"));
-        fields.add(new TableFieldSchema().setName("title").setType("STRING"));
-        fields.add(new TableFieldSchema().setName("views").setType("INTEGER"));
+        schema.forEach((key, val) -> fields.add(new TableFieldSchema().setName(key).setType(val)));
         return new TableSchema().setFields(fields);
     }
 
@@ -63,70 +60,76 @@ public class CopyBigQueryTablePipeline {
                 .withValidation()
                 .as(DataflowPipelineOptions.class);
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        List<BigQueryTableCopy> config = mapper.readValue(
-                new File(getClass().getClassLoader().getResource("bq_tables.yaml").getFile()),
-                new TypeReference<List<BigQueryTableCopy>>() {
+        List<Config> config = mapper.readValue(
+                new File(getClass().getClassLoader().getResource("config.yaml").getFile()),
+                new TypeReference<List<Config>>() {
                 });
-
-        BigQuery bigQuery = BigQueryOptions.getDefaultInstance().getService();
-        Storage storage = StorageOptions.getDefaultInstance().getService();
-
-        for (BigQueryTableCopy copy : config) {
-            String srcDatasetLocation = getDatasetLocation(copy.src, bigQuery);
-            String desDatasetLocation = getDatasetLocation(copy.des, bigQuery);
-
-            String gcsExtract = format("%s_df_bqcopy_extract_%s", options.getProject(), srcDatasetLocation);
-            maybeCreateBucket(gcsExtract, srcDatasetLocation, storage);
-
-            String gcsLoad = format("%s_df_bqcopy_load_%s", options.getProject(), desDatasetLocation);
-            maybeCreateBucket(gcsLoad, desDatasetLocation, storage);
-
-            options.setTempLocation(format("gs://%s/tmp", gcsExtract));
-            options.setStagingLocation(format("gs://%s/jars", gcsExtract));
-            options.setJobName(format("bq-table-copy-%s-to-%s-%d", srcDatasetLocation, desDatasetLocation, System.currentTimeMillis()));
-
-            Pipeline pipeline = Pipeline.create(options);
-            pipeline.apply(format("Read: %s", copy.src), BigQueryIO.readTableRows().from(copy.src))
-                    .apply("Transform", ParDo.of(new TableRowCopyParDo()))
-                    .apply(format("Write: %s", copy.des), BigQueryIO.writeTableRows()
-                            .to(copy.des)
-                            .withCreateDisposition(CREATE_IF_NEEDED)
-                            .withWriteDisposition(WRITE_TRUNCATE)
-                            .withSchema(getTableSchema())
-                            .withCustomGcsTempLocation(StaticValueProvider.of((format("gs://%s", gcsLoad)))));
-            pipeline.run();
-        }
+        config.forEach(configuration -> {
+            TableSchema schema = getTableSchema(configuration.schema);
+            configuration.tables.forEach(copy -> runDataflowCopyPipeline(
+                    options,
+                    schema,
+                    copy.get("source"),
+                    copy.get("destination")));
+        });
     }
 
-    private String getDatasetLocation(final String table, final BigQuery bigQuery) {
+    private void runDataflowCopyPipeline(DataflowPipelineOptions options, TableSchema schema, String source, String destination) {
+        String srcDatasetLocation = getDatasetLocation(source);
+        String desDatasetLocation = getDatasetLocation(destination);
+
+        String gcsExtract = format("%s_df_bqcopy_extract_%s", options.getProject(), srcDatasetLocation);
+        maybeCreateBucket(gcsExtract, srcDatasetLocation);
+
+        String gcsLoad = format("%s_df_bqcopy_load_%s", options.getProject(), desDatasetLocation);
+        maybeCreateBucket(gcsLoad, desDatasetLocation);
+
+        options.setTempLocation(format("gs://%s/tmp", gcsExtract));
+        options.setStagingLocation(format("gs://%s/jars", gcsExtract));
+        options.setJobName(format("bq-table-copy-%s-to-%s-%d", srcDatasetLocation, desDatasetLocation, currentTimeMillis()));
+
+        Pipeline pipeline = Pipeline.create(options);
+        pipeline.apply(format("Read: %s", source), BigQueryIO.readTableRows().from(source))
+                .apply("Transform", ParDo.of(new TableRowCopyParDo()))
+                .apply(format("Write: %s", destination), BigQueryIO.writeTableRows()
+                        .to(destination)
+                        .withCreateDisposition(CREATE_IF_NEEDED)
+                        .withWriteDisposition(WRITE_TRUNCATE)
+                        .withSchema(schema)
+                        .withCustomGcsTempLocation(StaticValueProvider.of((format("gs://%s", gcsLoad)))));
+        pipeline.run();
+    }
+
+    private String getDatasetLocation(String table) {
         String datasetName = BigQueryHelpers.parseTableSpec(table).getDatasetId();
-        return bigQuery.getDataset(DatasetId.of(datasetName)).getLocation().toLowerCase();
+        return BIGQUERY.getDataset(DatasetId.of(datasetName)).getLocation().toLowerCase();
     }
 
-    private void maybeCreateBucket(final String name, final String location, final Storage storage) {
+    private void maybeCreateBucket(String name, String location) {
         try {
-            storage.create(
+            STORAGE.create(
                     BucketInfo.newBuilder(name)
                             .setStorageClass(BQ_REGION_TO_GCS_BUCKET_TYPE.get(location))
                             .setLocation(location)
                             .build()
             );
         } catch (StorageException e) {
-            if (e.getCode() != 409) throw new RuntimeException(e); //bucket already exists
+            if (e.getCode() != 409) throw new RuntimeException(e); //409 == bucket already exists
         }
     }
 
     private static class TableRowCopyParDo extends DoFn<TableRow, TableRow> {
         @ProcessElement
         public void processElement(ProcessContext c) {
-            c.output(c.element());
+            c.output(c.element()); //1:1 copy
         }
     }
 
-    private static class BigQueryTableCopy {
+    //POJO for YAML config
+    private static class Config {
         @JsonProperty
-        public String src;
+        public List<Map<String, String>> tables;
         @JsonProperty
-        public String des;
+        public Map<String, String> schema;
     }
 }

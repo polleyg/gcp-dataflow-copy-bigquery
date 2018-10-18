@@ -27,7 +27,7 @@ dependencies {
 run {
     args = ["--project=grey-sort-challenge",
             "--runner=DataflowRunner",
-            "--maxNumWorkers=3",
+            "--maxNumWorkers=2",
             "--numWorkers=1",
     ]
 }
