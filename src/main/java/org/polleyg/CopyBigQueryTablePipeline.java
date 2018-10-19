@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
@@ -18,8 +17,6 @@ import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
-import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.transforms.ParDo;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -90,7 +87,6 @@ public class CopyBigQueryTablePipeline {
 
         Pipeline pipeline = Pipeline.create(options);
         pipeline.apply(format("Read: %s", source), BigQueryIO.readTableRows().from(source))
-                .apply("Transform", ParDo.of(new TableRowCopyParDo()))
                 .apply(format("Write: %s", destination), BigQueryIO.writeTableRows()
                         .to(destination)
                         .withCreateDisposition(CREATE_IF_NEEDED)
@@ -115,13 +111,6 @@ public class CopyBigQueryTablePipeline {
             );
         } catch (StorageException e) {
             if (e.getCode() != 409) throw new RuntimeException(e); //409 == bucket already exists
-        }
-    }
-
-    private static class TableRowCopyParDo extends DoFn<TableRow, TableRow> {
-        @ProcessElement
-        public void processElement(ProcessContext c) {
-            c.output(c.element()); //1:1 copy
         }
     }
 
