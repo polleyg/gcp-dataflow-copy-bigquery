@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.api.services.bigquery.model.TableFieldSchema;
+import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
@@ -38,6 +39,7 @@ public class CopyBigQueryTablePipeline {
             "us", StorageClass.MULTI_REGIONAL,
             "eu", StorageClass.MULTI_REGIONAL,
             "asia-northeast1", StorageClass.REGIONAL,
+            "australia-southeast1", StorageClass.REGIONAL,
             "europe-west2", StorageClass.REGIONAL);
 
     public static void main(String[] args) throws Exception {
@@ -96,9 +98,10 @@ public class CopyBigQueryTablePipeline {
         pipeline.run();
     }
 
-    private String getDatasetLocation(String table) {
-        String datasetName = BigQueryHelpers.parseTableSpec(table).getDatasetId();
-        return BIGQUERY.getDataset(DatasetId.of(datasetName)).getLocation().toLowerCase();
+    private String getDatasetLocation(String tableSpec) {
+        TableReference tableReference = BigQueryHelpers.parseTableSpec(tableSpec);
+        DatasetId datasetId = DatasetId.of(tableReference.getProjectId(), tableReference.getDatasetId());
+        return BIGQUERY.getDataset(datasetId).getLocation().toLowerCase();
     }
 
     private void maybeCreateBucket(String name, String location) {
