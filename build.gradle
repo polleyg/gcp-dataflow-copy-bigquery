@@ -25,10 +25,10 @@ dependencies {
 }
 
 run {
-    args = ["--project=grey-sort-challenge",
+    args = ["--project=james-boyce-playground", // spent some time trying to make this a variable but not familar enough with gradle
             "--runner=DataflowRunner",
             "--maxNumWorkers=2",
-            "--numWorkers=1",
+            "--numWorkers=1"
     ]
 }
 
