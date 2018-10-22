@@ -7,9 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
-import com.google.cloud.bigquery.BigQuery;
-import com.google.cloud.bigquery.BigQueryOptions;
-import com.google.cloud.bigquery.DatasetId;
+import com.google.cloud.bigquery.*;
 import com.google.cloud.storage.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
@@ -46,65 +44,74 @@ public class CopyBigQueryTablePipeline {
         new CopyBigQueryTablePipeline().execute(args);
     }
 
-    private static TableSchema getTableSchema(Map<String, String> schema) {
+    private static TableSchema getTableSchema(final String sourceTable) {
+        TableReference ref = BigQueryHelpers.parseTableSpec(sourceTable);
+        TableId tableId = TableId.of(ref.getProjectId(), ref.getDatasetId(), ref.getTableId());
         List<TableFieldSchema> fields = new ArrayList<>();
-        schema.forEach((key, val) -> fields.add(new TableFieldSchema().setName(key).setType(val)));
+        Schema realSchema = BIGQUERY.getTable(tableId).getDefinition().getSchema();
+        realSchema.getFields().forEach(f -> fields.add(
+                new TableFieldSchema().setName(f.getName()).setType(f.getType().name()))
+        );
         return new TableSchema().setFields(fields);
     }
 
-    private void execute(String[] args) throws Exception {
+    private void execute(final String[] args) throws Exception {
         PipelineOptionsFactory.register(DataflowPipelineOptions.class);
         DataflowPipelineOptions options = PipelineOptionsFactory
                 .fromArgs(args)
                 .withValidation()
                 .as(DataflowPipelineOptions.class);
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        List<Config> config = mapper.readValue(
+        Config config = mapper.readValue(
                 new File(getClass().getClassLoader().getResource("config.yaml").getFile()),
-                new TypeReference<List<Config>>() {
+                new TypeReference<Config>() {
+
                 });
-        config.forEach(configuration -> {
-            TableSchema schema = getTableSchema(configuration.schema);
-            configuration.tables.forEach(copy -> runDataflowCopyPipeline(
-                    options,
-                    schema,
-                    copy.get("source"),
-                    copy.get("destination")));
-        });
+
+        config.tables.forEach(table -> {
+                    String src = table.get("src");
+                    String des = table.get("des");
+                    runDataflowCopyPipeline(
+                            options,
+                            getTableSchema(src),
+                            src,
+                            des);
+                }
+        );
     }
 
-    private void runDataflowCopyPipeline(DataflowPipelineOptions options, TableSchema schema, String source, String destination) {
-        String srcDatasetLocation = getDatasetLocation(source);
-        String desDatasetLocation = getDatasetLocation(destination);
+    private void runDataflowCopyPipeline(final DataflowPipelineOptions options, final TableSchema schema, final String src, final String des) {
+        final String srcLocation = getDatasetLocation(src);
+        final String desLocation = getDatasetLocation(des);
 
-        String gcsExtract = format("%s_df_bqcopy_extract_%s", options.getProject(), srcDatasetLocation);
-        maybeCreateBucket(gcsExtract, srcDatasetLocation);
+        final String gcsExport = format("%s_df_bqcopy_extract_%s", options.getProject(), srcLocation);
+        final String gcsImport = format("%s_df_bqcopy_load_%s", options.getProject(), desLocation);
 
-        String gcsLoad = format("%s_df_bqcopy_load_%s", options.getProject(), desDatasetLocation);
-        maybeCreateBucket(gcsLoad, desDatasetLocation);
+        maybeCreateBucket(gcsExport, srcLocation);
+        maybeCreateBucket(gcsImport, desLocation);
 
-        options.setTempLocation(format("gs://%s/tmp", gcsExtract));
-        options.setStagingLocation(format("gs://%s/jars", gcsExtract));
-        options.setJobName(format("bq-table-copy-%s-to-%s-%d", srcDatasetLocation, desDatasetLocation, currentTimeMillis()));
+        options.setTempLocation(format("gs://%s/tmp", gcsExport));
+        options.setStagingLocation(format("gs://%s/jars", gcsExport));
+        options.setJobName(format("bq-table-copy-%s-to-%s-%d", srcLocation, desLocation, currentTimeMillis()));
 
         Pipeline pipeline = Pipeline.create(options);
-        pipeline.apply(format("Read: %s", source), BigQueryIO.readTableRows().from(source))
-                .apply(format("Write: %s", destination), BigQueryIO.writeTableRows()
-                        .to(destination)
+        pipeline.apply(format("Read: %s", src), BigQueryIO.readTableRows().from(src))
+                .apply(format("Write: %s", des), BigQueryIO.writeTableRows()
+                        .to(des)
                         .withCreateDisposition(CREATE_IF_NEEDED)
                         .withWriteDisposition(WRITE_TRUNCATE)
                         .withSchema(schema)
-                        .withCustomGcsTempLocation(StaticValueProvider.of((format("gs://%s", gcsLoad)))));
+                        .withCustomGcsTempLocation(StaticValueProvider.of((format("gs://%s", gcsImport)))));
         pipeline.run();
     }
 
-    private String getDatasetLocation(String tableSpec) {
+    private String getDatasetLocation(final String tableSpec) {
         TableReference tableReference = BigQueryHelpers.parseTableSpec(tableSpec);
         DatasetId datasetId = DatasetId.of(tableReference.getProjectId(), tableReference.getDatasetId());
         return BIGQUERY.getDataset(datasetId).getLocation().toLowerCase();
     }
 
-    private void maybeCreateBucket(String name, String location) {
+    private void maybeCreateBucket(final String name, final String location) {
         try {
             STORAGE.create(
                     BucketInfo.newBuilder(name)
@@ -121,7 +128,5 @@ public class CopyBigQueryTablePipeline {
     private static class Config {
         @JsonProperty
         public List<Map<String, String>> tables;
-        @JsonProperty
-        public Map<String, String> schema;
     }
 }
