@@ -2,6 +2,10 @@ apply plugin: "application"
 apply plugin: "java"
 apply plugin: "idea"
 
+def gcp_project
+
+gcp_project = System.getenv('PROJECT_ID') == null ? 'grey-sort-challenge' : System.getenv('PROJECT_ID')
+
 task wrapper(type: Wrapper) {
     gradleVersion = "4.10"
 }
@@ -25,7 +29,7 @@ dependencies {
 }
 
 run {
-    args = ["--project=james-boyce-playground", // spent some time trying to make this a variable but not familar enough with gradle
+    args = ["--project=" + gcp_project,
             "--runner=DataflowRunner",
             "--maxNumWorkers=2",
             "--numWorkers=1"
