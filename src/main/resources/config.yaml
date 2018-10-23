@@ -1,7 +1,19 @@
 tables:
-# US->EU (multi-regional)
-- source: james-boyce-playground:jb_test_move_US_AU.example_table
-  destination: james-boyce-playground:jb_i_was_moved.explicit_location_no_dataset_exists
+#  The Below moves data from EU to the `australia-southeast1` region, where the target dataset doesn't exist.
+- src: grey-sort-challenge:src_EU_dataset.src_EU_table
+  des: grey-sort-challenge:a_Sydney_dataset.i_was_copied_from_eu_to_sydney
   desRegion: australia-southeast1
-- source: james-boyce-playground:jb_test_move_US_AU.example_table
-  destination: james-boyce-playground:jb_i_was_moved.data_set_exists_use_its_location
+#  The Below moves data from US to the EU where the targert dataset is PREEXISTING.
+- src: grey-sort-challenge:src_US_dataset.src_US_table
+  des: grey-sort-challenge:a_EU_dataset.i_was_copied_from_us_to_eu
+  # EU->US (multi-regional)
+- src: grey-sort-challenge:src_EU_dataset.src_EU_table
+  des: grey-sort-challenge:a_US_dataset.i_was_copied_from_eu_to_us
+  desRegion: US
+  # EU->Tokyo (regional)
+- src: grey-sort-challenge:src_EU_dataset.src_EU_table
+  des: grey-sort-challenge:a_Tokyo_dataset.i_was_copied_from_eu_to_tokyo
+  desRegion: asia-northeast1
+
+
+## desRegion is optional IF THE TARGET DATASET PREEXISTS

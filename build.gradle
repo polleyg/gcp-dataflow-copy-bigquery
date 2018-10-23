@@ -2,9 +2,7 @@ apply plugin: "application"
 apply plugin: "java"
 apply plugin: "idea"
 
-def gcp_project
-
-gcp_project = System.getenv('PROJECT_ID') == null ? 'grey-sort-challenge' : System.getenv('PROJECT_ID')
+def gcp_project = System.getenv('PROJECT_ID') == null ? 'grey-sort-challenge' : System.getenv('PROJECT_ID')
 
 task wrapper(type: Wrapper) {
     gradleVersion = "4.10"
