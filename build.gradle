@@ -2,34 +2,36 @@ apply plugin: "application"
 apply plugin: "java"
 apply plugin: "idea"
 
+ext {
+    version="1.0"
+    beamVersion="2.8.0"
+    jacksonDataformatVersion="2.9.7"
+    jacksonDatabindVersion="2.9.7"
+    apacheCommsLang3Version="3.8.1"
+    bigqueryVersion="1.48.0"
+    gcsVersion="1.48.0"
+}
+
 task wrapper(type: Wrapper) {
     gradleVersion = "4.10"
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
 }
 
 dependencies {
     compile "org.slf4j:slf4j-log4j12:1.7.12"
-    compile "org.apache.beam:beam-sdks-java-core:{$beam_version}"
-    compile "org.apache.beam:beam-runners-google-cloud-dataflow-java:${beam_version}"
-    compile "org.apache.beam:beam-sdks-java-io-google-cloud-platform:${beam_version}"
-    compile "org.apache.beam:beam-sdks-java-extensions-google-cloud-platform-core:${beam_version}"
-    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jackson_dataformat_version}"
-    compile "com.fasterxml.jackson.core:jackson-databind:${jackson_databind_version}"
-    compile "org.apache.commons:commons-lang3:${apache_comms_lang3_version}"
-    compile "com.google.cloud:google-cloud-bigquery:${bigquery_version}"
-    compile "com.google.cloud:google-cloud-storage:${gcs_version}"
+    compile "org.apache.beam:beam-sdks-java-core:{$beamVersion}"
+    compile "org.apache.beam:beam-runners-google-cloud-dataflow-java:${beamVersion}"
+    compile "org.apache.beam:beam-runners-direct-java:${beamVersion}"
+    compile "org.apache.beam:beam-sdks-java-io-google-cloud-platform:${beamVersion}"
+    compile "org.apache.beam:beam-sdks-java-extensions-google-cloud-platform-core:${beamVersion}"
+    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jacksonDataformatVersion}"
+    compile "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+    compile "org.apache.commons:commons-lang3:${apacheCommsLang3Version}"
+    compile "com.google.cloud:google-cloud-bigquery:${bigqueryVersion}"
+    compile "com.google.cloud:google-cloud-storage:${gcsVersion}"
 }
 
-run {
-    args = ["--project=grey-sort-challenge",
-            "--runner=DataflowRunner",
-            "--maxNumWorkers=2",
-            "--numWorkers=1",
-    ]
-}
-
-mainClassName="org.polleyg.CopyBigQueryTablePipeline"
+mainClassName="org.polleyg.BQTableCopyPipeline"
