@@ -8,8 +8,8 @@ ext {
     jacksonDataformatVersion="2.9.7"
     jacksonDatabindVersion="2.9.7"
     apacheCommsLang3Version="3.8.1"
-    bigqueryVersion="1.48.0"
-    gcsVersion="1.48.0"
+    bigqueryVersion="1.52.0"
+    gcsVersion="1.52.0"
 }
 
 task wrapper(type: Wrapper) {
