@@ -1,10 +1,15 @@
 # [required] The GCP project id (not the number). You can find this in the GCP console.
-project: grey-sort-challenge
+project: gcp-project-101
 
 # [required] The type of runner. One of:
 # - dataflow (runs on GCP)
 # - local (runs on local machine)
 runner: dataflow
+
+# [required] The copy mode, discerning if an entire dataset is to be copied, or a set of defined tables. One of:
+# - dataset
+# - table
+copyMode: dataset
 
 # The actual tables to copy. Options:
 #
@@ -17,20 +22,74 @@ runner: dataflow
 # [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
 # [optional] writeDisposition: Either truncate or append. Default is truncate.
 # [optional] targetDatasetLocation: If the target dataset in BigQuery does not exist, use this to specify the location.
-copies:
-- source: grey-sort-challenge:src_US_dataset.src_US_table
-  target: grey-sort-challenge:a_EU_dataset.i_was_copied_from_us_to_eur
-  workerMachineType: n1-standard-2
-  zone: us-central1-a
+copyDataset:
+  source: bigquery-public-data:world_bank_wdi
+  target: gcp-project-101:world_bank_wdi
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
   writeDisposition: truncate
+  detectSchema: true
 
-- source: grey-sort-challenge:src_EU_dataset.src_EU_table
-  target: grey-sort-challenge:a_US_dataset.i_was_copied_from_eu_to_us
-  numWorkers: 2
-  maxNumWorkers: 5
-  zone: europe-north1-a
-  writeDisposition: append
+copyTables:
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions
+  target: gcp-project-101:world_bank_wdi.country_series_definitions
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true
 
-- source: grey-sort-challenge:src_EU_dataset.src_EU_table
-  target: grey-sort-challenge:a_Tokyo_dataset.i_was_copied_from_eu_to_tokyo
-  detectSchema: false
+- source: bigquery-public-data:world_bank_wdi.country_summary
+  target: gcp-project-101:world_bank_wdi.country_summary
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true
+
+- source: bigquery-public-data:world_bank_wdi.footnotes
+  target: gcp-project-101:world_bank_wdi.footnotes
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true
+
+- source: bigquery-public-data:world_bank_wdi.indicators_data
+  target: gcp-project-101:world_bank_wdi.indicators_data
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true
+
+- source: bigquery-public-data:world_bank_wdi.series_summary
+  target: gcp-project-101:world_bank_wdi.series_summary
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true
+
+- source: bigquery-public-data:world_bank_wdi.series_time
+  target: gcp-project-101:world_bank_wdi.series_time
+  workerMachineType: n1-standard-1
+  numWorkers: 1
+  maxNumWorkers: 2
+  targetDatasetLocation: australia-southeast1
+  zone: australia-southeast1-a
+  writeDisposition: truncate
+  detectSchema: true

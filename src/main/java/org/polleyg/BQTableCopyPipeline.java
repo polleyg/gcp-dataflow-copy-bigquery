@@ -1,5 +1,17 @@
 package org.polleyg;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
+import static java.lang.System.currentTimeMillis;
+import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
+import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_NEVER;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +20,7 @@ import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.BigQueryException;
 import com.google.cloud.storage.StorageException;
+
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
@@ -19,23 +32,13 @@ import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.String.format;
-import static java.lang.System.currentTimeMillis;
-import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
-import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_NEVER;
-
 /**
  * This application is designed to be used when you need to copy/transfer a BigQuery table(s) between location/region
  * e.g. copying a table from the US to the EU. If you are just copying a table(s) between the same location/region, then
  * you don't need this. Instead just use the `gcloud` CLI tool, WebUI, or the BigQuery API. Refer to the README.md for
  * details/instructions on how to use this application.
  *
- * @author Graham Polley
+ * @author Graham Polley, Matthew Grey
  */
 public class BQTableCopyPipeline {
     private static final Logger LOG = LoggerFactory.getLogger(BQTableCopyPipeline.class);
@@ -45,6 +48,9 @@ public class BQTableCopyPipeline {
     private static final String DEFAULT_ZONE = "australia-southeast1-a";
     private static final String DEFAULT_WRITE_DISPOSITION = "truncate";
     private static final String DEFAULT_DETECT_SCHEMA = "true";
+
+    private static final String COPY_MODE_DATASET = "dataset";
+    private static final String COPY_MODE_TABLE = "table";
 
     /**
      * @param args
@@ -72,10 +78,35 @@ public class BQTableCopyPipeline {
         DataflowPipelineOptions options = PipelineOptionsFactory
                 .fromArgs(args)
                 .as(DataflowPipelineOptions.class);
+
         options.setProject(config.project);
         options.setRunner(GCPHelpers.getRunnerClass(config.runner));
         LOG.info("Project set to '{}' and runner set to '{}'", config.project, config.runner);
-        config.copies.forEach(copy -> setupAndRunPipeline(options, copy));
+        LOG.info("Job set to run in '{}' copy mode", config.copyMode);
+
+        List<Map<String,String>> copies = null; 
+        if(config.copyMode.equals(COPY_MODE_DATASET)) {
+            if(config.copyDataset == null) {
+                throw new IllegalStateException("Dataset copy mode specified in configuration, but no datasetCopy value set");
+            }
+
+            copies = new ArrayList<>();
+            List<String> tableIds = GCPHelpers.getDatasetTableIds(config.copyDataset.get("source"));
+            for(String id : tableIds) {
+                copies.add(createTableCopyParams(id, config));
+            }
+        }
+        else if(config.copyMode.equals(COPY_MODE_TABLE)) {
+            if(config.copyTables == null || config.copyTables.size() == 0) {
+                throw new IllegalStateException("Table copy mode specified in configuration, but no tableCopies values set");
+            }
+            copies = config.copyTables;
+        }
+        else {
+            throw new IllegalStateException("No copy mode was defined in the configuration");
+        }
+        
+        copies.forEach(copy -> setupAndRunPipeline(options, copy));
     }
 
     /**
@@ -130,6 +161,7 @@ public class BQTableCopyPipeline {
                              final String targetTable,
                              final String targetDatasetLocation,
                              final WriteDisposition writeDisposition) {
+
         String targetLocation = getTargetDatasetLocation(targetTable, targetDatasetLocation);
         String sourceLocation = GCPHelpers.getDatasetLocation(sourceTable);
 
@@ -163,7 +195,6 @@ public class BQTableCopyPipeline {
         }
         pipeline.run();
     }
-
 
     /**
      * Wraps the creation of the GCS bucket in a try/catch block. If the bucket already exists it will swallow up the
@@ -210,10 +241,10 @@ public class BQTableCopyPipeline {
             try {
                 GCPHelpers.createBQDataset(targetTable, targetDatasetLocation);
             } catch (BigQueryException e) {
-                if (e.getCode() == HttpStatus.SC_CONFLICT) { // 409 == dataset already exists
-                    throw new IllegalStateException(
-                            format("'targetDatasetLocation' specified in config, but the dataset '%s' already exists",
-                                    targetTable));
+                if (e.getCode() == HttpStatus.SC_CONFLICT) { // 409 == dataset already exists but will be overwritten / appended
+                    // throw new IllegalStateException(
+                    //         format("'targetDatasetLocation' specified in config, but the dataset '%s' already exists",
+                    //                 targetTable));
                 } else {
                     throw new IllegalStateException(e);
                 }
@@ -224,14 +255,33 @@ public class BQTableCopyPipeline {
     }
 
     /**
+     * Creates a map of params for a single table copy pipeline, data is combined from dataset copy config & a table that was found inside the dataset
+     * 
+     * @param tableId the full table spec of the target table in format [PROJECT]:[DATASET].[TABLE]
+     * @param config a configuration map 
+     * @return a map of copy parameters for one table copy
+     */
+    private Map<String, String> createTableCopyParams(String tableId, Config config) {
+        Map<String,String> params = new HashMap<>(config.copyDataset);
+        params.put("source", tableId);
+        String tableName = tableId.split("\\.")[1];
+        params.put("target", format("%s.%s", config.copyDataset.get("target"), tableName));
+        return params;
+    }
+
+    /**
      * POJO for YAML config
      */
     private static class Config {
         @JsonProperty
-        public List<Map<String, String>> copies;
+        public List<Map<String, String>> copyTables;
+        @JsonProperty
+        public Map<String, String> copyDataset;
         @JsonProperty
         public String project;
         @JsonProperty
         public String runner;
+        @JsonProperty
+        public String copyMode;
     }
 }

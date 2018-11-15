@@ -3,12 +3,14 @@ package org.polleyg;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
+import com.google.api.gax.paging.Page;
 import com.google.cloud.bigquery.*;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableMap;
+
 import org.apache.beam.runners.dataflow.DataflowRunner;
 import org.apache.beam.runners.direct.DirectRunner;
 import org.apache.beam.sdk.PipelineRunner;
@@ -40,6 +42,33 @@ class GCPHelpers {
             "asia-northeast1", StorageClass.REGIONAL,
             "australia-southeast1", StorageClass.REGIONAL,
             "europe-west2", StorageClass.REGIONAL);
+
+    /**
+     * Retreives the table ids of all tables within a given dataset
+     * 
+     * @param datasetId the dataset spec in the format [PROJECT]:[DATASET]
+     * @return a list of full table specs in the format [PROJECT]:[DATASET].[TABLE]
+     */
+    static List<String> getDatasetTableIds(final String datasetIdStr) {
+
+        String[] datasetIdSplit = datasetIdStr.split("\\:");
+        if(datasetIdSplit.length < 2) {
+            throw new RuntimeException("Dataset Id specified but not in correct format ( [PROJECT]:[DATASET] )");
+        }
+        DatasetId datasetId = DatasetId.of(datasetIdSplit[0], datasetIdSplit[1]);
+        Dataset ds = BIGQUERY.getDataset(datasetId);
+        Page<Table> tables = ds.list(BigQuery.TableListOption.pageSize(100l));
+
+        LOG.info("Discovering dataset tables for: {}", datasetIdStr);
+        List<String> ids = new ArrayList<>();
+        for(Table table : tables.iterateAll()) {
+            TableId id = table.getTableId();
+            String tableId = format("%s:%s.%s", id.getProject(), id.getDataset(), id.getTable());
+            ids.add(tableId);
+            LOG.info("Found {}", tableId);
+        }
+        return ids;
+    }
 
     /**
      * Works out the table schema of the provided BigQuery table spec. Note, it currently does not support
