@@ -11,3 +11,8 @@ trigger_pipeline.sh
 key.json
 .DS_Store
 cloud-function/.vscode/
+.classpath
+.project
+.vscode
+.settings
+/bin

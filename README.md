@@ -33,6 +33,9 @@ to build, deploy and run it. The application will handle everything for you. See
 configure the application. It will create the necessary GCS buckets for you, and also in the correct locations. It can
 also create the BigQuery target dataset if you can't be bothered manually creating it beforehand.
 
+You can specify for the job to copy a list of individual tables from one region to another, or copy an entire dataset 
+from one region to another.
+
 ## How do I run it?
  1. Make sure all the relevant APIs are enabled on your GCP project. These include Cloud Dataflow,
 BigQuery, GCS, and Cloud Build.
@@ -43,14 +46,10 @@ service, or simply give it the `Project Editor` role if you're comfortable with 
  4. Finally, `gcloud builds submit --config=cloudbuild.yaml <path_to_repo>` 
 
 ## Any known limitations?
-Yes. I wrote this in my spare/personal time.
-
- - It does not support just specifying a BigQuery dataset and copying all tables contains. You need to list them 
- individually. This would be awesome.
- - Complex schemas are not supported e.g. nested records etc. If you have a complex schema, then create an empty table
+ Complex schemas are not supported e.g. nested records etc. If you have a complex schema, then create an empty table
  in the target dataset with the schema and set the flag `detectSchema` to `false` in the YAML config for the
  appropriate copy, and the application will skip trying to detect the schema.
  
- ## Can I contact you if I need some help?
- Sure. Email me at `polleyg@gmail.com`
+## Can I contact you if I need some help?
+Sure. Email me at `polleyg@gmail.com`
 
