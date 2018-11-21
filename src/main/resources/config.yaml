@@ -1,95 +1,61 @@
 # [required] The GCP project id (not the number). You can find this in the GCP console.
-project: gcp-project-101
+project: spanner-101
 
 # [required] The type of runner. One of:
 # - dataflow (runs on GCP)
 # - local (runs on local machine)
 runner: dataflow
 
-# [required] The copy mode, discerning if an entire dataset is to be copied, or a set of defined tables. One of:
-# - dataset
-# - table
-copyMode: dataset
-
-# The actual tables to copy. Options:
+# Copy parameters. These can be overwritten on a per-copy basis below. Options:
 #
-# [required] source: The source table in format [PROJECT]:[DATASET].[TABLE]
-# [required] target: The target table in format [PROJECT]:[DATASET].[TABLE]
+# [optional] workerMachineType: The type of the workers. Default is n1-standard-1.
 # [optional] numWorkers: The initial number of workers in the Dataflow cluster. Default is 1.
 # [optional] maxNumWorkers: The max number of workers in the Dataflow cluster. Default is 3.
-# [optional] workerMachineType: The type of the workers. Default is n1-standard-1.
-# [optional] zone: The zone where Dataflow cluster will spin up. Default is australia-southeast1-a.
-# [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
-# [optional] writeDisposition: Either truncate or append. Default is truncate.
 # [optional] targetDatasetLocation: If the target dataset in BigQuery does not exist, use this to specify the location.
-copyDataset:
-  source: bigquery-public-data:world_bank_wdi
-  target: gcp-project-101:world_bank_wdi
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
+# [optional] zone: The zone where Dataflow cluster will spin up. Default is australia-southeast1-a.
+# [optional] writeDisposition: Either truncate or append. Default is truncate.
+# [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
+# [optional] jobDelegationMode: Discerns if the dataset copy jobs should execute in one dataflow pipeline, or multiple (1 per table). One of:
+#                   - single (default) (all copy jobs occurr in one dataflow pipeline)
+#                   - multi  (each copy job gets its own dataflow pipeline)
+workerMachineType: n1-standard-1
+numWorkers: 1
+maxNumWorkers: 2
+zone: us-west1-a
+writeDisposition: truncate
+detectSchema: true
+jobDelegationMode: single
 
-copyTables:
+# The actual tables and datasets to copy. Options:
+#
+# [required] source: The source dataset/table in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
+# [required] target: The target dataset/table in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
+#
+# In 'single' jobDelegationMode, the following pipeline options may be overwritten per-copy
+# [optional] writeDisposition: Either truncate or append. Default is truncate.
+# [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
+# 
+# In 'multi' jobDelegationMode, all of the above pipeline options may be overwritten per-copy
+
+copies:
+  # Dataset copy
+# - source: bigquery-public-data:world_bank_wdi
+#   target: spanner-101:world_bank_wdi
+#   numWorkers: 2
+#   maxNumWorkers: 2
+
+  # Table copy to EU
 - source: bigquery-public-data:world_bank_wdi.country_series_definitions
-  target: gcp-project-101:world_bank_wdi.country_series_definitions
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
+  target: spanner-101:world_bank_wdi_US.country_series_definitions
+  maxNumWorkers: 1
+  workerMachineType: n1-standard-2
+  writeDisposition: append
+  targetDatasetLocation: US
 
-- source: bigquery-public-data:world_bank_wdi.country_summary
-  target: gcp-project-101:world_bank_wdi.country_summary
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
-
-- source: bigquery-public-data:world_bank_wdi.footnotes
-  target: gcp-project-101:world_bank_wdi.footnotes
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
-
-- source: bigquery-public-data:world_bank_wdi.indicators_data
-  target: gcp-project-101:world_bank_wdi.indicators_data
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
-
-- source: bigquery-public-data:world_bank_wdi.series_summary
-  target: gcp-project-101:world_bank_wdi.series_summary
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
-
-- source: bigquery-public-data:world_bank_wdi.series_time
-  target: gcp-project-101:world_bank_wdi.series_time
-  workerMachineType: n1-standard-1
-  numWorkers: 1
-  maxNumWorkers: 2
-  targetDatasetLocation: australia-southeast1
-  zone: australia-southeast1-a
-  writeDisposition: truncate
-  detectSchema: true
+  # Table copy to US
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions
+  target: spanner-101:world_bank_wdi_EU.country_series_definitions
+  maxNumWorkers: 1
+  workerMachineType: n1-standard-2
+  writeDisposition: append
+  targetDatasetLocation: EU
