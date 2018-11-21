@@ -34,7 +34,7 @@ configure the application. It will create the necessary GCS buckets for you, and
 also create the BigQuery target dataset if you can't be bothered manually creating it beforehand.
 
 You can specify for the job to copy a list of individual tables from one region to another, or copy an entire dataset 
-from one region to another.
+from one region to another. Dataset copying can be performed in one large Dataflow job, or split into multiple.
 
 ## How do I run it?
  1. Make sure all the relevant APIs are enabled on your GCP project. These include Cloud Dataflow,

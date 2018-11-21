@@ -86,12 +86,11 @@ public class BQTableCopyPipeline {
         LOG.info("Project set to '{}' and runner set to '{}'", config.project, config.runner);
         LOG.info("Jobs set to run in '{}' delegation mode", config.jobDelegationMode);
 
-        List<Map<String,String>> copyTables = new ArrayList<>(); 
         for(Map<String,String> copy : config.copies) {
+            
+            List<Map<String,String>> copyTables = new ArrayList<>(); 
             if(isDatasetTableSpec(copy.get("source"))){
-                List<String> tableIds = GCPHelpers.getDatasetTableIds(copy.get("source"));
-                
-                for(String id : tableIds) {
+                for(String id : GCPHelpers.getDatasetTableIds(copy.get("source"))) {
                     copyTables.add(createTableCopyParams(id, copy));
                 }
             }
@@ -102,6 +101,9 @@ public class BQTableCopyPipeline {
             if(copyTables.size() == 0) {
                 throw new IllegalStateException("No table or datasets were defined for copying in the config file");
             }
+
+            Map<String,String> fullTableParams = getFullTableCopyParams(copyTables.get(0), config); //use first copy command as base params for pipeline
+            handleTargetDatasetCreation(fullTableParams.get("target"), fullTableParams.get("targetDatasetLocation")); //handle dataset creation
             
             if(config.jobDelegationMode.equals(JOB_DELEGATION_MODE_MULTI)) {
                 copyTables.forEach(tableCopyParams -> setupAndRunPipeline(options, Arrays.asList(tableCopyParams), config));
@@ -132,14 +134,11 @@ public class BQTableCopyPipeline {
 
         handleBucketCreation(exportBucket, pipeParams.get("sourceLocation"));
         handleBucketCreation(importBucket, pipeParams.get("targetLocation"));
-
+        
         Pipeline pipeline = setupPipeline(options, pipeParams, importBucket, exportBucket);
         
         tableCopyParams.forEach(tableCopy -> {
-
             tableCopy = getFullTableCopyParams(tableCopy, config);
-
-            handleTargetDatasetCreation(tableCopy.get("target"), tableCopy.get("targetDatasetLocation"));
             
             TableSchema schema = null; //no schema is permitted
             if (Boolean.valueOf(tableCopy.get("detectSchema"))) {
@@ -177,7 +176,7 @@ public class BQTableCopyPipeline {
         options.setWorkerMachineType(worker);
         options.setTempLocation(format("gs://%s/tmp", exportBucket));
         options.setStagingLocation(format("gs://%s/jars", exportBucket));
-        options.setJobName(format("bq-copy-%s-to-%s-%d", pipelineParams.get("sourceLocation"), pipelineParams.get("targetLocation"), currentTimeMillis()));
+        options.setJobName(format("bq-copy-%s-to-%s-%d", pipelineParams.get("sourceLocation"), pipelineParams.get("targetLocation"), currentTimeMillis()).toLowerCase());
 
         LOG.info("Running Dataflow pipeline with options '{}'", options);
 
@@ -295,9 +294,6 @@ public class BQTableCopyPipeline {
                 GCPHelpers.createBQDataset(targetTable, targetDatasetLocation);
             } catch (BigQueryException e) {
                 if (e.getCode() == HttpStatus.SC_CONFLICT) { // 409 == dataset already exists
-                    String message = e.getMessage();
-                    String debug = e.getDebugInfo();
-                    System.err.println(message+" "+debug);
                     throw new IllegalStateException(
                             format("'targetDatasetLocation' specified in config, but the dataset '%s' already exists",
                                     targetTable));
