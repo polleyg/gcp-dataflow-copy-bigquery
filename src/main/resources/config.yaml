@@ -1,5 +1,5 @@
 # [required] The GCP project id (not the number). You can find this in the GCP console.
-project: spanner-101
+project: gcp-project-101
 
 # [required] The type of runner. One of:
 # - dataflow (runs on GCP)
@@ -24,7 +24,7 @@ maxNumWorkers: 2
 zone: us-west1-a
 writeDisposition: truncate
 detectSchema: true
-jobDelegationMode: single
+jobDelegationMode: multi
 
 # The actual tables and datasets to copy. Options:
 #
@@ -38,24 +38,24 @@ jobDelegationMode: single
 # In 'multi' jobDelegationMode, all of the above pipeline options may be overwritten per-copy
 
 copies:
-  # Dataset copy
-# - source: bigquery-public-data:world_bank_wdi
-#   target: spanner-101:world_bank_wdi
-#   numWorkers: 2
-#   maxNumWorkers: 2
-
-  # Table copy to EU
-- source: bigquery-public-data:world_bank_wdi.country_series_definitions
-  target: spanner-101:world_bank_wdi_US.country_series_definitions
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions  # Table copy to US
+  target: gcp-project-101:world_bank_wdi_US.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
   targetDatasetLocation: US
 
-  # Table copy to US
-- source: bigquery-public-data:world_bank_wdi.country_series_definitions
-  target: spanner-101:world_bank_wdi_EU.country_series_definitions
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions # Table copy to EU
+  target: gcp-project-101:world_bank_wdi_EU.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
   targetDatasetLocation: EU
+
+- source: bigquery-public-data:world_bank_wdi # Dataset copy to Sydney
+  target: gcp-project-101:world_bank_wdi_AUS
+  numWorkers: 5
+  maxNumWorkers: 5
+  workerMachineType: n1-standard-2
+  writeDisposition: append
+  targetDatasetLocation: australia-southeast1
