@@ -1,5 +1,5 @@
 # [required] The GCP project id (not the number). You can find this in the GCP console.
-project: gcp-project-101
+project: <YOUR_PROJECT_ID>
 
 # [required] The type of runner. One of:
 # - dataflow (runs on GCP)
@@ -15,47 +15,29 @@ runner: dataflow
 # [optional] zone: The zone where Dataflow cluster will spin up. Default is australia-southeast1-a.
 # [optional] writeDisposition: Either truncate or append. Default is truncate.
 # [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
-# [optional] jobDelegationMode: Discerns if the dataset copy jobs should execute in one dataflow pipeline, or multiple (1 per table). One of:
-#                   - single (default) (all copy jobs occurr in one dataflow pipeline)
-#                   - multi  (each copy job gets its own dataflow pipeline)
-workerMachineType: n1-standard-1
-numWorkers: 1
-maxNumWorkers: 2
-zone: us-west1-a
-writeDisposition: truncate
-detectSchema: true
-jobDelegationMode: multi
-
-# The actual tables and datasets to copy. Options:
-#
-# [required] source: The source dataset/table in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
-# [required] target: The target dataset/table in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
-#
-# In 'single' jobDelegationMode, the following pipeline options may be overwritten per-copy
-# [optional] writeDisposition: Either truncate or append. Default is truncate.
-# [optional] detectSchema: Either true or false. Use this as a workaround for complex schemas. Default is true.
-# 
-# In 'multi' jobDelegationMode, all of the above pipeline options may be overwritten per-copy
-
+# [optional] composite: Either true or false. If true, Dataflow runs all copies as 1 job/pipeline. If false, each copy
+#                       is run as as an independent Dataflow job/pipeline. Default is true.
+# [required] source: The source in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
+# [required] target: The target in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
 copies:
-- source: bigquery-public-data:world_bank_wdi.country_series_definitions  # Table copy to US
-  target: gcp-project-101:world_bank_wdi_US.country_series_definitions
+# Dataset copy
+- source: bigquery-public-data:world_bank_wdi
+  target: <YOUR_PROJECT_ID>:world_bank_wdi
+  numWorkers: 2
+  maxNumWorkers: 2
+
+# Table copy to EU
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions
+  target: <YOUR_PROJECT_ID>:world_bank_wdi_US.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
   targetDatasetLocation: US
 
-- source: bigquery-public-data:world_bank_wdi.country_series_definitions # Table copy to EU
-  target: gcp-project-101:world_bank_wdi_EU.country_series_definitions
+  # Table copy to US
+- source: bigquery-public-data:world_bank_wdi.country_series_definitions
+  target: <YOUR_PROJECT_ID>:world_bank_wdi_EU.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
   targetDatasetLocation: EU
-
-- source: bigquery-public-data:world_bank_wdi # Dataset copy to Sydney
-  target: gcp-project-101:world_bank_wdi_AUS
-  numWorkers: 5
-  maxNumWorkers: 5
-  workerMachineType: n1-standard-2
-  writeDisposition: append
-  targetDatasetLocation: australia-southeast1

@@ -3,14 +3,12 @@ package org.polleyg;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
-import com.google.api.gax.paging.Page;
 import com.google.cloud.bigquery.*;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageClass;
 import com.google.cloud.storage.StorageException;
 import com.google.cloud.storage.StorageOptions;
 import com.google.common.collect.ImmutableMap;
-
 import org.apache.beam.runners.dataflow.DataflowRunner;
 import org.apache.beam.runners.direct.DirectRunner;
 import org.apache.beam.sdk.PipelineRunner;
@@ -22,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.google.cloud.storage.BucketInfo.newBuilder;
 import static java.lang.String.format;
@@ -44,30 +44,33 @@ class GCPHelpers {
             "europe-west2", StorageClass.REGIONAL);
 
     /**
-     * Retreives the table ids of all tables within a given dataset
-     * 
-     * @param datasetId the dataset spec in the format [PROJECT]:[DATASET]
-     * @return a list of full table specs in the format [PROJECT]:[DATASET].[TABLE]
+     * Retrieves the table ids of all tables within a given dataset
+     *
+     * @param datasetSpec the dataset spec in the format [PROJECT]:[DATASET]
+     * @return a list of table ids for the given dataset
      */
-    static List<String> getDatasetTableIds(final String datasetIdStr) {
-
-        String[] datasetIdSplit = datasetIdStr.split("\\:");
-        if(datasetIdSplit.length < 2) {
-            throw new RuntimeException("Dataset Id specified but not in correct format ( [PROJECT]:[DATASET] )");
+    static List<TableId> getTableIds(final String datasetSpec) {
+        TableReference tableReference = BigQueryHelpers.parseTableSpec(datasetSpec);
+        if (tableReference.getDatasetId() == null) {
+            throw new IllegalStateException(String.format("No dataset could be found for %s", datasetSpec));
         }
-        DatasetId datasetId = DatasetId.of(datasetIdSplit[0], datasetIdSplit[1]);
-        Dataset ds = BIGQUERY.getDataset(datasetId);
-        Page<Table> tables = ds.list(BigQuery.TableListOption.pageSize(100l));
+        LOG.debug("Discovering tables in the dataset: {}", datasetSpec);
+        DatasetId datasetId = DatasetId.of(tableReference.getProjectId(), tableReference.getDatasetId());
+        return StreamSupport
+                .stream(BIGQUERY.listTables(datasetId).iterateAll().spliterator(), false)
+                .map(table -> table.getTableId())
+                .collect(Collectors.toList());
 
-        LOG.info("Discovering dataset tables for: {}", datasetIdStr);
-        List<String> ids = new ArrayList<>();
-        for(Table table : tables.iterateAll()) {
-            TableId id = table.getTableId();
-            String tableId = format("%s:%s.%s", id.getProject(), id.getDataset(), id.getTable());
-            ids.add(tableId);
-            LOG.info("Found {}", tableId);
-        }
-        return ids;
+    }
+
+    /**
+     * Returns the TableId as Strings in the format [PROJECT]:[DATASET].[TABLE]
+     *
+     * @param tableId
+     * @return
+     */
+    static String getTableIdAsString(final TableId tableId) {
+        return format("%s:%s.%s", tableId.getProject(), tableId.getDataset(), tableId.getTable());
     }
 
     /**
@@ -78,7 +81,7 @@ class GCPHelpers {
      * @return the TableSchema.
      */
     static TableSchema getTableSchema(final String tableSpec) {
-        LOG.info("Fetching schema for '{}'", tableSpec);
+        LOG.debug("Fetching schema for '{}'", tableSpec);
         TableReference ref = BigQueryHelpers.parseTableSpec(tableSpec);
         TableId tableId = TableId.of(ref.getProjectId(), ref.getDatasetId(), ref.getTableId());
         List<TableFieldSchema> fields = new ArrayList<>();
@@ -98,7 +101,7 @@ class GCPHelpers {
      */
     static void createGCSBucket(final String bucketName,
                                 final String location) throws StorageException {
-        LOG.info("Requested to create bucket '{}' in location '{}'..", bucketName, location);
+        LOG.debug("Requested to create bucket '{}' in location '{}'..", bucketName, location);
         StorageClass storageClass = BQ_LOCATION_TO_GCS_STORAGE_CLASS.get(location);
         STORAGE.create(newBuilder(bucketName)
                 .setStorageClass(storageClass)
@@ -118,7 +121,7 @@ class GCPHelpers {
     static void createBQDataset(final String tableSpec,
                                 final String location) throws BigQueryException {
         TableReference ref = BigQueryHelpers.parseTableSpec(tableSpec);
-        LOG.info("Requested to create dataset '{}' in location '{}'..", ref.getDatasetId(), location);
+        LOG.debug("Requested to create dataset '{}' in location '{}'..", ref.getDatasetId(), location);
         DatasetInfo datasetInfo = DatasetInfo.newBuilder(ref.getProjectId(), ref.getDatasetId())
                 .setLocation(location)
                 .build();
@@ -133,7 +136,7 @@ class GCPHelpers {
      * @return the location of the dataset
      */
     static String getDatasetLocation(final String tableSpec) {
-        LOG.info("Fetching BigQuery dataset location for '{}'", tableSpec);
+        LOG.debug("Fetching BigQuery dataset location for '{}'", tableSpec);
         TableReference tableReference = BigQueryHelpers.parseTableSpec(tableSpec);
         DatasetId datasetId = DatasetId.of(tableReference.getProjectId(), tableReference.getDatasetId());
         return BIGQUERY.getDataset(datasetId).getLocation().toLowerCase();
@@ -186,5 +189,15 @@ class GCPHelpers {
                         " Use one of 'truncate' or 'append'", writeDisposition));
         }
         return result;
+    }
+
+    /**
+     * Determines if the table spec ( [PROJECT]:[DATASET].[TABLE] ) is that of an entire dataset or a single table
+     *
+     * @param spec the table spec to test
+     * @return boolean true if spec is for a dataset
+     */
+    static Boolean isDatasetTableSpec(String spec) {
+        return BigQueryHelpers.parseTableSpec(spec).getTableId() == null;
     }
 }
