@@ -87,6 +87,12 @@ public class BQTableCopyPipeline {
         }
     }
 
+    /**
+     * Use arguments and Config pojo to prepare the DataflowPipelineOptions POJO
+     * @param args application input arguments
+     * @param config Table config parsed from application arguments and file contents
+     * @return DataflowPipelineOptions object ready to be run
+     **/
     private DataflowPipelineOptions getDataflowPipelineOptions(String[] args, Config config) {
         final String[] dataflowArgs = removeConfigPathFromArgs(args);
         PipelineOptionsFactory.register(DataflowPipelineOptions.class);
@@ -101,6 +107,12 @@ public class BQTableCopyPipeline {
         return options;
     }
 
+    /**
+     * Extracts the Config pojo from arguments and file content
+     * @param args application input arguments
+     * @param mapper application object mapper
+     * @return Config pojo for tables to be copied
+     **/
     private Config setConfig(String[] args, ObjectMapper mapper) throws java.io.IOException {
         String configPath = extractConfigPath(args);
         LOG.info("Fetching config from: " + configPath);
