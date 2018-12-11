@@ -16,6 +16,7 @@ import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,8 @@ public class BQTableCopyPipeline {
     private static final String DEFAULT_WRITE_DISPOSITION = "truncate";
     private static final String DEFAULT_DETECT_SCHEMA = "true";
 
+    private static String CONFIG_PATH; //This will be set once throughout execution at runtime
+
     /**
      * @param args
      * @throws Exception
@@ -65,13 +68,15 @@ public class BQTableCopyPipeline {
      */
     private void copy(final String[] args) throws Exception {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        final String[] trimmedArgs = extractAndRemoveConfigPath(args);
+
         Config config = mapper.readValue(
-                new File(getClass().getClassLoader().getResource("config.yaml").getFile()),
+                new File(getClass().getClassLoader().getResource(CONFIG_PATH).getFile()),
                 new TypeReference<Config>() {
                 });
         PipelineOptionsFactory.register(DataflowPipelineOptions.class);
         DataflowPipelineOptions options = PipelineOptionsFactory
-                .fromArgs(args)
+                .fromArgs(trimmedArgs)
                 .as(DataflowPipelineOptions.class);
         if (config.copies == null || config.copies.size() == 0) {
             throw new IllegalStateException("No table or datasets were defined for copying in the config file");
@@ -91,6 +96,25 @@ public class BQTableCopyPipeline {
             }
             copyTables.forEach(tableCopyParams -> setupAndRunPipeline(options, Arrays.asList(tableCopyParams), config));
         }
+    }
+
+    private String[] extractAndRemoveConfigPath(String[] args) {
+        if(Objects.isNull(args) || args.length != 1){
+            throw new RuntimeException("Incorrect number or Arguments"); // We shouldn't ever have this thrown as its defaulted*/
+        }
+
+        final String configString = "--configPath=";
+
+        // Remove our argument(s) from the set before binding to beam arguments
+        for (String arg : args) {
+            if (arg.startsWith(configString)){
+                CONFIG_PATH =  arg.replaceFirst(configString,"");  // remove config key from argument
+                LOG.info("Reading config from: " + CONFIG_PATH);
+                return ArrayUtils.removeElement(args, arg);
+            }
+        }
+
+        return args;
     }
 
     /**
