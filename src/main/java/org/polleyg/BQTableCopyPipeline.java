@@ -8,7 +8,7 @@ import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.BigQueryException;
 import com.google.cloud.bigquery.TableId;
-import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.*;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.file.Paths;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -29,6 +30,9 @@ import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_NEVER;
+import static org.polleyg.GCPHelpers.extractConfigPath;
+import static org.polleyg.GCPHelpers.getGCSFile;
+import static org.polleyg.GCPHelpers.removeConfigPathFromArgs;
 
 /**
  * This application is designed to be used when you need to copy/transfer a BigQuery table(s) between location/region
@@ -48,8 +52,6 @@ public class BQTableCopyPipeline {
     private static final String DEFAULT_WRITE_DISPOSITION = "truncate";
     private static final String DEFAULT_DETECT_SCHEMA = "true";
 
-    private static String CONFIG_PATH; //This will be set once throughout execution at runtime
-
     /**
      * @param args
      * @throws Exception
@@ -68,21 +70,8 @@ public class BQTableCopyPipeline {
      */
     private void copy(final String[] args) throws Exception {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        final String[] trimmedArgs = extractAndRemoveConfigPath(args);
-
-        Config config = mapper.readValue(
-                new File(getClass().getClassLoader().getResource(CONFIG_PATH).getFile()),
-                new TypeReference<Config>() {
-                });
-        PipelineOptionsFactory.register(DataflowPipelineOptions.class);
-        DataflowPipelineOptions options = PipelineOptionsFactory
-                .fromArgs(trimmedArgs)
-                .as(DataflowPipelineOptions.class);
-        if (config.copies == null || config.copies.size() == 0) {
-            throw new IllegalStateException("No table or datasets were defined for copying in the config file");
-        }
-        options.setProject(config.project);
-        options.setRunner(GCPHelpers.getRunnerClass(config.runner));
+        Config config = setConfig(args, mapper);
+        DataflowPipelineOptions options = getDataflowPipelineOptions(args, config);
 
         LOG.info("BigQuery table copy: {}", config);
 
@@ -98,23 +87,32 @@ public class BQTableCopyPipeline {
         }
     }
 
-    private String[] extractAndRemoveConfigPath(String[] args) {
-        if(Objects.isNull(args) || args.length != 1){
-            throw new RuntimeException("Incorrect number or Arguments"); // We shouldn't ever have this thrown as its defaulted*/
+    private DataflowPipelineOptions getDataflowPipelineOptions(String[] args, Config config) {
+        final String[] dataflowArgs = removeConfigPathFromArgs(args);
+        PipelineOptionsFactory.register(DataflowPipelineOptions.class);
+        DataflowPipelineOptions options = PipelineOptionsFactory
+                .fromArgs(dataflowArgs)
+                .as(DataflowPipelineOptions.class);
+        if (config.copies == null || config.copies.size() == 0) {
+            throw new IllegalStateException("No table or datasets were defined for copying in the config file");
+        }
+        options.setProject(config.project);
+        options.setRunner(GCPHelpers.getRunnerClass(config.runner));
+        return options;
+    }
+
+    private Config setConfig(String[] args, ObjectMapper mapper) throws java.io.IOException {
+        String configPath = extractConfigPath(args);
+        LOG.info("Fetching config from: " + configPath);
+        //get from gcs if in format: "gs://[BUCKET_NAME]/[OBJECT_NAME]"
+        if(configPath.startsWith("gs://")){
+            configPath = getGCSFile(configPath);
         }
 
-        final String configString = "--configPath=";
-
-        // Remove our argument(s) from the set before binding to beam arguments
-        for (String arg : args) {
-            if (arg.startsWith(configString)){
-                CONFIG_PATH =  arg.replaceFirst(configString,"");  // remove config key from argument
-                LOG.info("Reading config from: " + CONFIG_PATH);
-                return ArrayUtils.removeElement(args, arg);
-            }
-        }
-
-        return args;
+        return mapper.readValue(
+                new File(getClass().getClassLoader().getResource(configPath).getFile()),
+                new TypeReference<Config>() {
+                });
     }
 
     /**

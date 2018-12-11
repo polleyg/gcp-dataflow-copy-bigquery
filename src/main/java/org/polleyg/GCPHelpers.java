@@ -4,19 +4,18 @@ import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.*;
-import com.google.cloud.storage.Storage;
-import com.google.cloud.storage.StorageClass;
-import com.google.cloud.storage.StorageException;
-import com.google.cloud.storage.StorageOptions;
+import com.google.cloud.storage.*;
 import com.google.common.collect.ImmutableMap;
 import org.apache.beam.runners.dataflow.DataflowRunner;
 import org.apache.beam.runners.direct.DirectRunner;
 import org.apache.beam.sdk.PipelineRunner;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryHelpers;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition;
+import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -199,5 +198,68 @@ class GCPHelpers {
      */
     static Boolean isDatasetTableSpec(String spec) {
         return BigQueryHelpers.parseTableSpec(spec).getTableId() == null;
+    }
+
+    /**
+     * Pull a file from GCS and write it out to /tmp/
+     * @param gcsPath location of a file in GCS in "gs://[BUCKET_NAME]/[OBJECT_NAME]" format
+     * @return string absolute path of file written out to /tmp/
+     **/
+    static String getGCSFile(String gcsPath) {
+        String path = gcsPath.replace("gs://","");
+        Storage gcs = StorageOptions.getDefaultInstance().getService();
+
+        //bucketname should be first element in string with format "gs://[BUCKET_NAME]/[OBJECT_NAME]"
+        String[] sections = path.split("/",1);
+        if(sections.length < 2){
+            final String errMsg = "GCS Url must be in format 'gs://[BUCKET_NAME]/[OBJECT_NAME]'. Found: " + path;
+            LOG.error(errMsg);
+            throw new RuntimeException(errMsg);
+        }
+
+        String bucketName = sections[0]; //get bucketname
+        String srcFilename = String.join("/", ArrayUtils.removeElement(sections, bucketName)); //remove bucketname and rejoin
+        String localPath = "/tmp/" + srcFilename;
+
+        Blob blob = gcs.get(BlobId.of(bucketName, srcFilename));
+        blob.downloadTo(Paths.get(localPath));
+
+        return localPath;
+
+    }
+
+    /**
+     * Extracts value of the configPath from the array of input args
+     * @param args application input arguments
+     * @return string value of the configPath argument
+     **/
+    static String extractConfigPath(String[] args) {
+        final String configString = "--configPath=";
+
+        // Remove our argument(s) from the set before binding to beam arguments
+        for (String arg : args) {
+            if (arg.startsWith(configString)) {
+                return arg.replaceFirst(configString, "");  // remove config key from argument
+            }
+        }
+        throw new RuntimeException("No configPath found"); // We shouldn't ever have this thrown as its defaulted*/
+    }
+
+    /**
+     * Removes the string key and value of the configPath from the array of input args
+     * @param args application input arguments
+     * @return string[] args value with configPath removed
+     **/
+    static String[] removeConfigPathFromArgs(String[] args){
+        final String configString = "--configPath=";
+
+        // Remove our argument(s) from the set before binding to beam arguments
+        for (String arg : args) {
+            if (arg.startsWith(configString)) {
+                return ArrayUtils.removeElement(args, arg);
+            }
+        }
+
+        return args;
     }
 }

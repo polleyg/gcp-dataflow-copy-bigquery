@@ -1,5 +1,5 @@
 # [required] The GCP project id (not the number). You can find this in the GCP console.
-project: <YOUR_PROJECT_ID>
+project: test_proj
 
 # [required] The type of runner. One of:
 # - dataflow (runs on GCP)
@@ -21,14 +21,14 @@ runner: dataflow
 # [required] target: The target in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
 copies:
 # Dataset copy
-- source: bigquery-public-data:world_bank_wdi
-  target: <YOUR_PROJECT_ID>:world_bank_wdi
-  numWorkers: 2
-  maxNumWorkers: 2
+#- source: bigquery-public-data:world_bank_wdi
+#  target: test_proj:world_bank_wdi
+#  numWorkers: 2
+#  maxNumWorkers: 2
 
 # Table copy to EU
 - source: bigquery-public-data:world_bank_wdi.country_series_definitions
-  target: <YOUR_PROJECT_ID>:world_bank_wdi_US.country_series_definitions
+  target: test_proj:world_bank_wdi_US.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
@@ -36,7 +36,7 @@ copies:
 
   # Table copy to US
 - source: bigquery-public-data:world_bank_wdi.country_series_definitions
-  target: <YOUR_PROJECT_ID>:world_bank_wdi_EU.country_series_definitions
+  target: test_proj:world_bank_wdi_EU.country_series_definitions
   maxNumWorkers: 1
   workerMachineType: n1-standard-2
   writeDisposition: append
