@@ -20,11 +20,6 @@ runner: dataflow
 # [required] source: The source in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
 # [required] target: The target in format [PROJECT]:[DATASET] for dataset or [PROJECT]:[DATASET].[TABLE] for table
 copies:
-# Dataset copy
-- source: bigquery-public-data:world_bank_wdi
-  target: <YOUR_PROJECT_ID>:world_bank_wdi
-  numWorkers: 2
-  maxNumWorkers: 2
 
 # Table copy to EU
 - source: bigquery-public-data:world_bank_wdi.country_series_definitions
