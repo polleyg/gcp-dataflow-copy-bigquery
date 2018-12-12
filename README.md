@@ -42,8 +42,16 @@ BigQuery, GCS, and Cloud Build.
  2. Elevate permissions on the Cloud Build service account that was created for you by Google. It will look something
 like `<your_project_number>@cloudbuild.gserviceaccount.com`. You can give it only the required permissions for each
 service, or simply give it the `Project Editor` role if you're comfortable with that.
- 3. Clone the GitHub repo and make the necessary changes to `config.yaml`
- 4. Finally, `gcloud builds submit --config=cloudbuild.yaml <path_to_repo>` 
+
+#### Option A: Clone and Source control your config
+ 3A. Clone the GitHub repo and make the necessary changes to `config.yaml`  
+ 4A. Finally, `gcloud builds submit --config=cloudbuild.yaml <path_to_repo>`  
+  
+#### Option B: Provide config in GCS (CloudBuild must have access to this file)
+ 3B. Pull the GitHub repo  
+ 4B. Upload your config to GCS `gs://bucket/containing/my/config.yaml`   
+ 5B. Finally, `gcloud builds submit --config=cloudbuild.yaml --substitutions=_APP_ARGS=--configPath=gs://bucket/containing/my/config.yaml`
+  
 
 ## Any known limitations?
  Complex schemas are not supported e.g. nested records etc. If you have a complex schema, then create an empty table

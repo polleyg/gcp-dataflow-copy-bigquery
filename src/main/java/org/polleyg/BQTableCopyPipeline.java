@@ -8,7 +8,7 @@ import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.cloud.bigquery.BigQueryException;
 import com.google.cloud.bigquery.TableId;
-import com.google.cloud.storage.StorageException;
+import com.google.cloud.storage.*;
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
@@ -28,6 +28,9 @@ import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_IF_NEEDED;
 import static org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.CreateDisposition.CREATE_NEVER;
+import static org.polleyg.GCPHelpers.extractConfigPath;
+import static org.polleyg.GCPHelpers.getGCSFile;
+import static org.polleyg.GCPHelpers.removeConfigPathFromArgs;
 
 /**
  * This application is designed to be used when you need to copy/transfer a BigQuery table(s) between location/region
@@ -65,32 +68,64 @@ public class BQTableCopyPipeline {
      */
     private void copy(final String[] args) throws Exception {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        Config config = mapper.readValue(
-                new File(getClass().getClassLoader().getResource("config.yaml").getFile()),
-                new TypeReference<Config>() {
-                });
-        PipelineOptionsFactory.register(DataflowPipelineOptions.class);
-        DataflowPipelineOptions options = PipelineOptionsFactory
-                .fromArgs(args)
-                .as(DataflowPipelineOptions.class);
-        if (config.copies == null || config.copies.size() == 0) {
-            throw new IllegalStateException("No table or datasets were defined for copying in the config file");
-        }
-        options.setProject(config.project);
-        options.setRunner(GCPHelpers.getRunnerClass(config.runner));
+        Config config = setConfig(args, mapper);
+        DataflowPipelineOptions options = getDataflowPipelineOptions(args, config);
 
         LOG.info("BigQuery table copy: {}", config);
 
         List<Map<String, String>> copyTables = new ArrayList<>();
         for (Map<String, String> copy : config.copies) {
+
             if (GCPHelpers.isDatasetTableSpec(copy.get("source"))) {
                 List<TableId> tableIds = GCPHelpers.getTableIds(copy.get("source"));
                 tableIds.forEach(id -> copyTables.add(createTableCopyParams(GCPHelpers.getTableIdAsString(id), copy)));
             } else {
                 copyTables.add(copy);
             }
+            handleTargetDatasetCreation(copy.get("target"), copy.get("targetDatasetLocation"));
             copyTables.forEach(tableCopyParams -> setupAndRunPipeline(options, Arrays.asList(tableCopyParams), config));
         }
+    }
+
+    /**
+     * Use arguments and Config pojo to prepare the DataflowPipelineOptions POJO
+     * @param args application input arguments
+     * @param config Table config parsed from application arguments and file contents
+     * @return DataflowPipelineOptions object ready to be run
+     **/
+    private DataflowPipelineOptions getDataflowPipelineOptions(String[] args, Config config) {
+        final String[] dataflowArgs = removeConfigPathFromArgs(args);
+        PipelineOptionsFactory.register(DataflowPipelineOptions.class);
+        DataflowPipelineOptions options = PipelineOptionsFactory
+                .fromArgs(dataflowArgs)
+                .as(DataflowPipelineOptions.class);
+        if (config.copies == null || config.copies.size() == 0) {
+            throw new IllegalStateException("No table or datasets were defined for copying in the config file");
+        }
+        options.setProject(config.project);
+        options.setRunner(GCPHelpers.getRunnerClass(config.runner));
+        return options;
+    }
+
+    /**
+     * Extracts the Config pojo from arguments and file content
+     * @param args application input arguments
+     * @param mapper application object mapper
+     * @return Config pojo for tables to be copied
+     **/
+    private Config setConfig(String[] args, ObjectMapper mapper) throws java.io.IOException {
+        LOG.info("Args parsed: " + Arrays.toString(args));
+        String configPath = extractConfigPath(args);
+        LOG.info("Fetching config from: " + configPath);
+        //get from gcs if in format: "gs://[BUCKET_NAME]/[OBJECT_NAME]"
+        if(configPath.startsWith("gs://")){
+            configPath = getGCSFile(configPath);
+        }
+
+        return mapper.readValue(
+                new File(getClass().getClassLoader().getResource(configPath).getFile()),
+                new TypeReference<Config>() {
+                });
     }
 
     /**
@@ -119,8 +154,6 @@ public class BQTableCopyPipeline {
         tableCopyParams.forEach(tableCopy -> {
 
             tableCopy = getFullTableCopyParams(tableCopy, config);
-
-            handleTargetDatasetCreation(tableCopy.get("target"), tableCopy.get("targetDatasetLocation"));
 
             TableSchema schema = null; //no schema is permitted
             if (Boolean.valueOf(tableCopy.get("detectSchema"))) {
