@@ -12,10 +12,6 @@ ext {
     gcsVersion="1.52.0"
 }
 
-run {
-    args findProperty("args")
-}
-
 task wrapper(type: Wrapper) {
     gradleVersion = "4.10"
 }

@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -210,15 +211,16 @@ class GCPHelpers {
         Storage gcs = StorageOptions.getDefaultInstance().getService();
 
         //bucketname should be first element in string with format "gs://[BUCKET_NAME]/[OBJECT_NAME]"
-        String[] sections = path.split("/",1);
+        String[] sections = path.split("/");
         if(sections.length < 2){
-            final String errMsg = "GCS Url must be in format 'gs://[BUCKET_NAME]/[OBJECT_NAME]'. Found: " + path;
+            LOG.info(Arrays.toString(sections));
+            final String errMsg = "GCS Url must be in format 'gs://[BUCKET_NAME]/[OBJECT_NAME]'. Found: " + gcsPath;
             LOG.error(errMsg);
             throw new RuntimeException(errMsg);
         }
 
         String bucketName = sections[0]; //get bucketname
-        String srcFilename = String.join("/", ArrayUtils.removeElement(sections, bucketName)); //remove bucketname and rejoin
+        String srcFilename = path.replaceFirst(bucketName + "/", ""); //remove bucketname and rejoin
         String localPath = "/tmp/" + srcFilename;
 
         Blob blob = gcs.get(BlobId.of(bucketName, srcFilename));

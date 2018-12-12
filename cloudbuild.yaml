@@ -3,7 +3,7 @@ steps:
   args: ['clone', 'https://github.com/polleyg/gcp-dataflow-copy-bigquery.git']
 
 - name: gcr.io/cloud-builders/gradle
-  args: ['build', 'run' ,'-Pargs=--configPath=${_CONFIG_PATH}']
+  args: ['build', 'run' ,'--args=${_ARGS}']
 
 substitutions:
-  _CONFIG_PATH: 'config.yaml' # default value
+  _ARGS: '--configPath=config.yaml' # default value
