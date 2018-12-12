@@ -220,13 +220,16 @@ class GCPHelpers {
         }
 
         String bucketName = sections[0]; //get bucketname
-        String srcFilename = path.replaceFirst(bucketName + "/", ""); //remove bucketname and rejoin
-        String localPath = "/tmp/" + srcFilename;
+        String srcFilePath = path.replaceFirst(bucketName + "/", ""); //remove bucketname and rejoin
+        String srcFilename = sections[sections.length - 1];
 
-        Blob blob = gcs.get(BlobId.of(bucketName, srcFilename));
-        blob.downloadTo(Paths.get(localPath));
+        LOG.info(String.format("Bucketname: %s, srcPath: %s, srcFile: %s",bucketName,srcFilePath,srcFilename));
 
-        return localPath;
+
+        Blob blob = gcs.get(BlobId.of(bucketName, srcFilePath));
+        blob.downloadTo(Paths.get(srcFilename));
+
+        return srcFilename;
 
     }
 

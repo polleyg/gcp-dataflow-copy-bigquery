@@ -16,13 +16,11 @@ import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.Write.WriteDisposition;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -77,12 +75,14 @@ public class BQTableCopyPipeline {
 
         List<Map<String, String>> copyTables = new ArrayList<>();
         for (Map<String, String> copy : config.copies) {
+
             if (GCPHelpers.isDatasetTableSpec(copy.get("source"))) {
                 List<TableId> tableIds = GCPHelpers.getTableIds(copy.get("source"));
                 tableIds.forEach(id -> copyTables.add(createTableCopyParams(GCPHelpers.getTableIdAsString(id), copy)));
             } else {
                 copyTables.add(copy);
             }
+            handleTargetDatasetCreation(copy.get("target"), copy.get("targetDatasetLocation"));
             copyTables.forEach(tableCopyParams -> setupAndRunPipeline(options, Arrays.asList(tableCopyParams), config));
         }
     }
@@ -114,6 +114,7 @@ public class BQTableCopyPipeline {
      * @return Config pojo for tables to be copied
      **/
     private Config setConfig(String[] args, ObjectMapper mapper) throws java.io.IOException {
+        LOG.info("Args parsed: " + Arrays.toString(args));
         String configPath = extractConfigPath(args);
         LOG.info("Fetching config from: " + configPath);
         //get from gcs if in format: "gs://[BUCKET_NAME]/[OBJECT_NAME]"
@@ -153,8 +154,6 @@ public class BQTableCopyPipeline {
         tableCopyParams.forEach(tableCopy -> {
 
             tableCopy = getFullTableCopyParams(tableCopy, config);
-
-            handleTargetDatasetCreation(tableCopy.get("target"), tableCopy.get("targetDatasetLocation"));
 
             TableSchema schema = null; //no schema is permitted
             if (Boolean.valueOf(tableCopy.get("detectSchema"))) {

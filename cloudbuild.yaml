@@ -1,9 +1,10 @@
 steps:
 - name: gcr.io/cloud-builders/git
-  args: ['clone', 'https://github.com/polleyg/gcp-dataflow-copy-bigquery.git']
+  args: ['clone', '${_SOURCE_REPO}' ]
 
 - name: gcr.io/cloud-builders/gradle
-  args: ['build', 'run' ,'--args=${_ARGS}']
+  args: ['build', 'run' ,'-PappArgs="${_APP_ARGS}"']
 
 substitutions:
-  _ARGS: '--configPath=config.yaml' # default value
+  _APP_ARGS: '--configPath=config.yaml' # default value
+  _SOURCE_REPO: 'https://github.com/polleyg/gcp-dataflow-copy-bigquery.git' #default value, this allows you to test on your own repo

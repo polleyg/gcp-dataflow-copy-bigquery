@@ -16,6 +16,12 @@ task wrapper(type: Wrapper) {
     gradleVersion = "4.10"
 }
 
+run {
+    if (project.hasProperty("appArgs")) {
+        args Eval.me(appArgs)
+    }
+}
+
 repositories {
     mavenCentral()
 }
