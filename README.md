@@ -47,10 +47,10 @@ service, or simply give it the `Project Editor` role if you're comfortable with 
  3A. Clone the GitHub repo and make the necessary changes to `config.yaml`  
  4A. Finally, `gcloud builds submit --config=cloudbuild.yaml <path_to_repo>`  
   
-####Option B: Provide config in GCS
+####Option B: Provide config in GCS (CloudBuild must have access to this file)
  3B. Pull the GitHub repo  
  4B. Upload your config to GCS `gs://bucket/containing/my/config.yaml`   
- 5B. Finally, `gcloud builds submit --config=cloudbuild.yaml --substitutions=_ARGS='--configPath=gs://bucket/containing/my/config.yaml' <path_to_repo>`   
+ 5B. Finally, ` gcloud builds submit --config=cloudbuild.yaml --substitutions=_APP_ARGS=--configPath=gs://bucket/containing/my/config.yaml  
   
 
 ## Any known limitations?
